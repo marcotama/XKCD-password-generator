@@ -54,6 +54,13 @@ except AttributeError as ex:
     else:
         raise ex
 
+DELIMITERS = '%/|!:-_\'"&*.+@#$'
+CLEAN_DELIM_REGX = re.compile('[' + DELIMITERS + ']')
+
+
+def clean_delimiters(word):
+    return CLEAN_DELIM_REGX.sub('', word)
+
 
 # Python 3 compatibility
 if sys.version_info[0] >= 3:
@@ -310,15 +317,35 @@ def set_case(words, method="lower", testing=False):
 
 def generate_xkcdpassword(wordlist,
                           numwords=6,
+                          delimiter_pad=False,
+                          digit_pad=False,
                           interactive=False,
                           acrostic=False,
-                          delimiter=" ",
+                          delimiter=None,
                           case="lower"):
     """
     Generate an XKCD-style password from the words in wordlist.
     """
+    if delimiter is None:
+        delimiter = rng().choice(DELIMITERS)
 
     passwd = None
+
+    def pad(passw, _delimiter_pad, _digit_pad):
+        if _digit_pad:
+            passw = '{digit1}{delimiter}{passw}{delimiter}{digit2}'.format(
+                digit1=rng().randint(10, 99), digit2=rng().randint(10, 99),
+                delimiter=delimiter,
+                passw=passw
+            )
+
+        if _delimiter_pad:
+            passw = delimiter * 2 + passw + delimiter * 2
+
+        return passw
+
+    # clean words for any special characters
+    wordlist = [clean_delimiters(w) for w in wordlist]
 
     # generate the worddict if we are looking for acrostics
     if acrostic:
@@ -330,12 +357,12 @@ def generate_xkcdpassword(wordlist,
         else:
             words = find_acrostic(acrostic, worddict)
 
-        return delimiter.join(set_case(words, method=case))
+        return pad(delimiter.join(set_case(words, method=case)), delimiter_pad, digit_pad)
 
     # useful if driving the logic from other code
     if not interactive:
         return gen_passwd()
-        
+
     # else, interactive session
     else:
         # define input validators
@@ -344,21 +371,21 @@ def generate_xkcdpassword(wordlist,
 
         # generate passwords until the user accepts
         accepted = False
-        
+
         while not accepted:
             passwd = gen_passwd()
             print("Generated: " + passwd)
             accepted = try_input("Accept? [yN] ", accepted_validator)
             print('accepted', accepted)
         return passwd
-        
+
 
 def initialize_interactive_run(options):
     def n_words_validator(answer):
             """
             Validate custom number of words input
             """
-            
+
             if isinstance(answer, str) and len(answer) == 0:
                 return options.numwords
             try:
@@ -370,11 +397,45 @@ def initialize_interactive_run(options):
                 sys.stderr.write("Please enter a positive integer\n")
                 sys.exit(1)
 
+    def bool_validator_false(answer):
+        if not isinstance(answer, str):
+            sys.stderr.write("Please enter y or n\n")
+            sys.exit(1)
+        if len(answer) == 0:
+            return False
+
+        if answer.lower() in ('y', 'yes'):
+            return True
+
+        if answer.lower() in ('n', 'no'):
+            return False
+
+        sys.stderr.write("Please enter y or n\n")
+        sys.exit(1)
+
+    # default is no
+    def accepted_validator(answer):
+        return answer.lower().strip() in ["y", "yes"]
+
+    # default is yes
+    def rejected_validator(answer):
+        return answer.lower().strip() in ["n", "no"]
+
     if not options.acrostic:
         n_words_prompt = ("Enter number of words (default {0}):\n".format(options.numwords))
         options.numwords = try_input(n_words_prompt, n_words_validator)
     else:
         options.numwords = len(options.acrostic)
+
+    options.delimiter_pad = try_input('Use delimiter padding? (default {0}):'
+                              ' '.format(options.delimiter_pad),
+                              rejected_validator if options.delimiter_pad else
+                              accepted_validator)
+
+    options.digit_pad = try_input('Use digit padding? (default {0}):'
+                          ' '.format(options.digit_pad),
+                          rejected_validator if options.digit_pad else
+                          accepted_validator)
 
 
 def emit_passwords(wordlist, options):
@@ -389,6 +450,8 @@ def emit_passwords(wordlist, options):
                 acrostic=options.acrostic,
                 delimiter=options.delimiter,
                 case=options.case,
+                delimiter_pad=options.delimiter_pad,
+                digit_pad=options.digit_pad,
             ),
             end=options.separator)
         count -= 1
@@ -453,7 +516,9 @@ class XkcdPassArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             "-d", "--delimiter",
             dest="delimiter", default=" ", metavar="DELIM",
-            help="Separate words within a passphrase with DELIM.")
+            help="Separate words within a passphrase with DELIM. "
+                 "If no delimiter is specified, a random will be "
+                 "chosen.")
         self.add_argument(
             "-s", "--separator",
             dest="separator", default="\n", metavar="SEP",
@@ -468,6 +533,12 @@ class XkcdPassArgumentParser(argparse.ArgumentParser):
                 "Choices: {cap_meths} (default: 'lower').".format(
                     cap_meths=list(CASE_METHODS.keys())
                 )))
+        self.add_argument('-p', '--delimiter-pad', action='store_true',
+                          help='pad password with 2 delimiter characters '
+                               'on both sides')
+        self.add_argument('-P', '--digit-pad', action='store_true',
+                      help='pad password with 2 digits '
+                           'on both sides')
         self.add_argument(
             "--allow-weak-rng",
             action="store_true", dest="allow_weak_rng", default=False,
@@ -500,7 +571,7 @@ def main(argv=None):
 
         if options.interactive:
             initialize_interactive_run(options)
-        
+
         if options.verbose:
             verbose_reports(my_wordlist, options)
 
