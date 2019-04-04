@@ -54,7 +54,7 @@ except AttributeError as ex:
     else:
         raise ex
 
-DELIMITERS = '%/|!:-_\'"&*.+@#$'
+DELIMITERS = '%/:-_*.+@#'
 CLEAN_DELIM_REGX = re.compile('[' + DELIMITERS + ']')
 
 
@@ -515,7 +515,7 @@ class XkcdPassArgumentParser(argparse.ArgumentParser):
             help="Generate COUNT passphrases.")
         self.add_argument(
             "-d", "--delimiter",
-            dest="delimiter", default=" ", metavar="DELIM",
+            dest="delimiter", default=None, metavar="DELIM",
             help="Separate words within a passphrase with DELIM. "
                  "If no delimiter is specified, a random will be "
                  "chosen.")
