@@ -4,7 +4,7 @@ import sys
 
 setup(
     name='xkcdpass',
-    version='1.17.3',
+    version='1.17.4',
     author='Steven Tobin',
     author_email='steventtobin@gmail.com',
     url='https://github.com/redacted/XKCD-password-generator',
@@ -30,6 +30,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Environment :: Console',
         'Operating System :: OS Independent',
         'License :: OSI Approved :: BSD License',
